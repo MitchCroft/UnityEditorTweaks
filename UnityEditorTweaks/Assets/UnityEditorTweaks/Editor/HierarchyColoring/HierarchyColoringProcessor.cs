@@ -211,8 +211,8 @@ namespace UnityEditorTweaks.HierarchyColoring {
                         EditorGUI.DrawPreviewTexture(new Rect(selectionRect.position, selectionRect.size + BACK_RECT_PADDING), textureCache[hash]);
 
                         //Display the label for this object
-                        EditorGUI.LabelField(new Rect(selectionRect.position + labelIndentation, selectionRect.size - labelIndentation), display.name, new GUIStyle {
-                            normal = new GUIStyleState { textColor = InvertColor(colorBuffer[0]) },
+                        EditorGUI.LabelField(new Rect(selectionRect.position + labelIndentation, selectionRect.size - labelIndentation), EditorGUIUtility.ObjectContent(display, display.GetType()), new GUIStyle {
+                            normal = new GUIStyleState { textColor = InvertColor(colorBuffer[0]) * (display.activeInHierarchy ? 1f : .5f) },
                             fontStyle = FontStyle.Bold
                         });
                     }
