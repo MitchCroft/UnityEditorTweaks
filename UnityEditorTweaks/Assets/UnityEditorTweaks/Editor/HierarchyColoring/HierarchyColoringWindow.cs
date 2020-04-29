@@ -97,6 +97,18 @@ namespace UnityEditorTweaks.HierarchyColoring {
         /// </summary>
         private Vector2 processScrollProgress;
 
+        /// <summary>
+        /// Store the GUI content labels that will be displayed within this window
+        /// </summary>
+        private GUIContent displayHeader,
+                           multiLabel,
+                           gradientLabel,
+                           indentLabel,
+                           processingHeader,
+                           colorLabel,
+                           overrideLabel,
+                           textColLabel;
+
         /*----------Functions----------*/
         //PRIVATE
 
@@ -168,7 +180,19 @@ namespace UnityEditorTweaks.HierarchyColoring {
         /// <summary>
         /// Initialise this objects internal information
         /// <summary>
-        private void Awake() { titleContent = new GUIContent("Hierarchy Coloring"); }
+        private void Awake() {
+            titleContent = new GUIContent("Hierarchy Coloring");
+
+            //Create the GUI Content objects for the different display elements
+            displayHeader = new GUIContent("Display Settings");
+            multiLabel = new GUIContent("Allow Multicolored", "Flags if multiple colors are allowed to be used or if only the first applicable to an object should be used");
+            gradientLabel = new GUIContent("Use Gradient", "Flags if a gradient should be used if more then one color value should be applied to an option");
+            indentLabel = new GUIContent("Label Indentation", "The number of pixels the colored labels will be indented when displayed");
+            processingHeader = new GUIContent("Processing Elements");
+            colorLabel = new GUIContent("Highlight", "The color that will be used to fill the line of hierarchy objects that meet these criteria");
+            overrideLabel = new GUIContent("Override Text Color", "Flags if the text color that is used to display the element should be overridden to use the set supplied value. In the event of multiple elements being applied, the first will be used");
+            textColLabel = new GUIContent("Text Color", "The color that will be applied to the hierarchy element to help distinguish it from the background color");
+        }
 
         /// <summary>
         /// Render the window UI controls to the display area
@@ -178,21 +202,21 @@ namespace UnityEditorTweaks.HierarchyColoring {
             EditorGUI.BeginChangeCheck();
 
             //Display the basic settings 
-            EditorGUILayout.LabelField("Display Settings", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(displayHeader, EditorStyles.boldLabel);
 
             //Display the toggle options
             HierarchyColoringProcessor.allowMultiColored = EditorGUILayout.Toggle(
-                new GUIContent("Allow Multicolored", "Flags if multiple colors are allowed to be used or if only the first applicable to an object should be used"),
+                multiLabel,
                 HierarchyColoringProcessor.allowMultiColored
             );
             HierarchyColoringProcessor.useGradient = EditorGUILayout.Toggle(
-                new GUIContent("Use Gradient", "Flags if a gradient should be used if more then one color value should be applied to an option"), 
+                gradientLabel, 
                 HierarchyColoringProcessor.useGradient
             );
 
             //Display an option for modifying the indentation of the displayed elements
             HierarchyColoringProcessor.labelIndentation.x = Mathf.Max(0f, EditorGUILayout.FloatField(
-                new GUIContent("Label Indentation", "The number of pixels the colored labels will be indented when displayed"),
+                indentLabel,
                 HierarchyColoringProcessor.labelIndentation.x
             ));
 
@@ -226,8 +250,8 @@ namespace UnityEditorTweaks.HierarchyColoring {
             ReorderableList list = new ReorderableList(values, typeof(ColoringValues), true, true, true, true);
 
             //Override the drawing elements to use the property defaults
-            list.elementHeightCallback += (index) => (EditorGUIUtility.singleLineHeight + LINE_BUFFER_SPACE) * 2;
-            list.drawHeaderCallback = (Rect rect) => EditorGUI.LabelField(rect, "Processing Elements");
+            list.elementHeightCallback += (index) => (EditorGUIUtility.singleLineHeight + LINE_BUFFER_SPACE) * (values[index].overrideTextColor ? 4.05f : 3.05f);
+            list.drawHeaderCallback = (Rect rect) => EditorGUI.LabelField(rect, processingHeader);
             list.drawElementCallback += (Rect rect, int index, bool isActive, bool isFocused) => {
                 //Display the enumeration option as the first selection option
                 ETextType newType = (ETextType)EditorGUI.EnumPopup(
@@ -310,9 +334,27 @@ namespace UnityEditorTweaks.HierarchyColoring {
 
                 //Display the color value that will be used to highlight the nominated objects
                 values[index].color = EditorGUI.ColorField(
-                    new Rect(rect.x, rect.y + (EditorGUIUtility.singleLineHeight + LINE_BUFFER_SPACE) * 1f, rect.width, EditorGUIUtility.singleLineHeight), 
+                    new Rect(rect.x, rect.y + (EditorGUIUtility.singleLineHeight + LINE_BUFFER_SPACE) * 1f, rect.width, EditorGUIUtility.singleLineHeight),
+                    colorLabel,
                     values[index].color
                 );
+
+                //Display the toggle field for setting the text override color
+                bool isOverridden = values[index].overrideTextColor;
+                values[index].overrideTextColor = EditorGUI.Toggle(
+                    new Rect(rect.x, rect.y + (EditorGUIUtility.singleLineHeight + LINE_BUFFER_SPACE) * 2f, rect.width, EditorGUIUtility.singleLineHeight),
+                    overrideLabel,
+                    values[index].overrideTextColor
+                );
+
+                //Check if the text color override should be displayed for modification
+                if (isOverridden) {
+                    values[index].textColor = EditorGUI.ColorField(
+                        new Rect(rect.x, rect.y + (EditorGUIUtility.singleLineHeight + LINE_BUFFER_SPACE) * 3f, rect.width, EditorGUIUtility.singleLineHeight),
+                        textColLabel,
+                        values[index].textColor
+                    );
+                }
             };
 
             return list;

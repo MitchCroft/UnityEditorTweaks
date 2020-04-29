@@ -29,6 +29,16 @@ namespace UnityEditorTweaks.HierarchyColoring {
             /// The color that will be displayed when this text has been matched
             /// </summary>
             public Color color = Color.white;
+
+            /// <summary>
+            /// Flags if the text color will be overridden for display in the hierarchy
+            /// </summary>
+            public bool overrideTextColor = false;
+
+            /// <summary>
+            /// The color that will be used to display the hierarchy label if overridden
+            /// </summary>
+            public Color textColor = Color.black;
         }
 
         /// <summary>
@@ -62,20 +72,27 @@ namespace UnityEditorTweaks.HierarchyColoring {
             /// <summary>
             /// Store the editor preference key strings for storing processing values
             /// </summary>
-            private const string PREF_PROCESS_COUNT = "{5C51E63B-10DC-486C-9415-792AB85D139C}",
-                                 PREF_PROCESS_TYPE = "{302ED2D5-3D8E-4F1A-B5FE-792098CEA855}",
-                                 PREF_PROCESS_TEXT = "{1B21C261-AC0C-4DAA-ACCD-43DB526C8E44}",
-                                 PREF_PROCESS_COLOR = "{B3D6E894-627E-4D24-9505-D56FBAF93CB2}",
-                                 PREF_ALLOW_MULTI   = "{B42DFB46-9317-41C6-BB53-4C87E26576ED}",
-                                 PREF_USE_GRADIENT  = "{3BEDD28A-DC20-4391-88F7-A13D15ECA9DB}",
-                                 PREF_LBL_INDENT    = "{4C19EBB7-89CB-417C-998C-255A4BB23F1B}";
-
+            private const string PREF_PROCESS_COUNT     = "{5C51E63B-10DC-486C-9415-792AB85D139C}",
+                                 PREF_PROCESS_TYPE      = "{302ED2D5-3D8E-4F1A-B5FE-792098CEA855}",
+                                 PREF_PROCESS_TEXT      = "{1B21C261-AC0C-4DAA-ACCD-43DB526C8E44}",
+                                 PREF_PROCESS_COLOR     = "{B3D6E894-627E-4D24-9505-D56FBAF93CB2}",
+                                 PREF_PROCESS_OVER      = "{8B82D8F3-58C6-4C53-A376-A2BC9D018E73}",
+                                 PREF_PROCESS_TEXTCOL   = "{2E6E7BC5-D4AC-4C03-BF8A-8811AEB3A62D}",
+                                 PREF_ALLOW_MULTI       = "{B42DFB46-9317-41C6-BB53-4C87E26576ED}",
+                                 PREF_USE_GRADIENT      = "{3BEDD28A-DC20-4391-88F7-A13D15ECA9DB}",
+                                 PREF_LBL_INDENT        = "{4C19EBB7-89CB-417C-998C-255A4BB23F1B}";
+            
             //PRIVATE
 
             /// <summary>
             /// Store a buffer of color values that can be applied to the displayed elements
             /// </summary>
             private static List<Color> colorBuffer;
+
+            /// <summary>
+            /// Store the color that will be used to display the text element
+            /// </summary>
+            private static Color? textColor;
 
             /// <summary>
             /// Store a cache of images that will be displayed on the required elements within the inspector
@@ -117,11 +134,16 @@ namespace UnityEditorTweaks.HierarchyColoring {
                 for (int i = 0; i < COUNT; ++i) {
                     toProcess.Add(new ColoringValues {
                         textType = (ETextType)EditorPrefs.GetInt(PREF_PROCESS_TYPE + i),
-                        text = EditorPrefs.GetString(PREF_PROCESS_TEXT + i)
+                        text = EditorPrefs.GetString(PREF_PROCESS_TEXT + i),
+                        overrideTextColor = EditorPrefs.GetBool(PREF_PROCESS_OVER + i)
                     });
                     if (!ColorUtility.TryParseHtmlString(EditorPrefs.GetString(PREF_PROCESS_COLOR + i), out toProcess[i].color)) {
                         Debug.LogError("Hierarchy Coloring failed to process the color for value at index " + i);
                         toProcess[i].color = Color.magenta;
+                    }
+                    if (!ColorUtility.TryParseHtmlString(EditorPrefs.GetString(PREF_PROCESS_TEXTCOL + i), out toProcess[i].textColor)) {
+                        Debug.LogError("Hierarchy Coloring failed to process the text color for value at index " + i);
+                        toProcess[i].textColor = Color.black;
                     }
                 }
 
@@ -159,8 +181,9 @@ namespace UnityEditorTweaks.HierarchyColoring {
 
                 //If there is a Game Object, process them
                 if (display) {
-                    //Clear the color buffer for this object
+                    //Clear the buffers for this object
                     colorBuffer.Clear();
+                    textColor = null;
 
                     //Store the hash code used to access the cached display texture 
                     int hash = 17;
@@ -193,8 +216,12 @@ namespace UnityEditorTweaks.HierarchyColoring {
                             //Add the color to the buffer
                             colorBuffer.Add(toProcess[i].color);
 
-                            //Modifiy the hash code to cache texture elements
+                            //Modify the hash code to cache texture elements
                             hash = hash * 31 + toProcess[i].color.GetHashCode();
+
+                            //Check to see if the text is overridden
+                            if (!textColor.HasValue && toProcess[i].overrideTextColor)
+                                textColor = toProcess[i].textColor;
 
                             //Check to see if more then color can be used
                             if (!allowMultiColored) break;
@@ -212,7 +239,7 @@ namespace UnityEditorTweaks.HierarchyColoring {
 
                         //Display the label for this object
                         EditorGUI.LabelField(new Rect(selectionRect.position + labelIndentation, selectionRect.size - labelIndentation), EditorGUIUtility.ObjectContent(display, display.GetType()), new GUIStyle {
-                            normal = new GUIStyleState { textColor = InvertColor(colorBuffer[0]) * (display.activeInHierarchy ? 1f : .5f) },
+                            normal = new GUIStyleState { textColor = (textColor.HasValue ? textColor.Value : InvertColor(colorBuffer[0])) * (display.activeInHierarchy ? 1f : .5f) },
                             fontStyle = FontStyle.Bold
                         });
                     }
@@ -290,7 +317,9 @@ namespace UnityEditorTweaks.HierarchyColoring {
                 for (int i = 0; i < toProcess.Count; ++i) {
                     EditorPrefs.SetInt(PREF_PROCESS_TYPE + i, (int)toProcess[i].textType);
                     EditorPrefs.SetString(PREF_PROCESS_TEXT + i, toProcess[i].text);
-                    EditorPrefs.SetString(PREF_PROCESS_COLOR + i, "#" + ColorUtility.ToHtmlStringRGB(toProcess[i].color));
+                    EditorPrefs.SetString(PREF_PROCESS_COLOR + i, "#" + ColorUtility.ToHtmlStringRGBA(toProcess[i].color));
+                    EditorPrefs.SetBool(PREF_PROCESS_OVER + i, toProcess[i].overrideTextColor);
+                    EditorPrefs.SetString(PREF_PROCESS_TEXTCOL + i, "#" + ColorUtility.ToHtmlStringRGBA(toProcess[i].textColor));
                 }
                 EditorPrefs.SetBool(PREF_ALLOW_MULTI, allowMultiColored);
                 EditorPrefs.SetBool(PREF_USE_GRADIENT, useGradient);
